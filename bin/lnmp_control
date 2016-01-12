@@ -1,0 +1,110 @@
+#!/bin/sh
+
+BINDIR=$(dirname $(readlink -f $0))
+ENV_CHECK=0
+if [ -f $BINDIR/../opbin/self_monitor ];then
+    . $BINDIR/../opbin/self_monitor
+    if [ $? -ne 0 ]
+    then
+        echo "[FATAL] can't load ../opbin/self_monitor"
+        exit 1
+    fi
+    ENV_CHECK=1
+fi
+
+. "`dirname \"${0}\"`/common.inc" || exit 1
+cd "${LNMP_ROOT}" || exit 1
+
+PHPFPM_CONTROL=bin/phpfpm_control
+NGINX_CONTROL=bin/nginx_control
+
+LOGROTATE_BIN=bin/logrotate
+LOGROTATE_STATUS=run/rotate.status
+LOGROTATE_CONF=etc/logrotate.conf
+DB_CHECK=opbin/dbaccess.sh
+
+if [ ! -L ./lib/libldap-2.2.so.7 ]; then
+    ln -s /lib64/libldap-2.4.so.2 ./lib/libldap-2.2.so.7
+fi
+
+lnmp_help(){
+    echo "${0} <start|stop|restart|reload|rotate>"
+    exit 1
+}
+
+db_check(){
+    if [ ! -f ${DB_CHECK} ]; then
+        return 1
+    fi
+    ${DB_CHECK}
+    if [ $? -ne 0 ]; then
+        echo "[FAIL] db_check fail" 1>&2
+        exit 1
+    fi
+}
+
+self_check () {
+    is_ttm_loaded
+    
+    set_max_file_descriptor 1000000
+
+    set_max_memory 20971520
+    
+    is_disk_full 100000 /home
+
+    is_inode_exhausted 50 /home
+
+    is_user_work
+
+    is_enough_free_memory_threshold 20    
+}
+
+
+lnmp_start(){
+    if [ "$ENV_CHECK" -eq "1" ];then
+        self_check
+    fi
+    db_check
+    ./bin/php ./bin/genwhite.php
+    ${PHPFPM_CONTROL} start && ${NGINX_CONTROL} start
+    return $?
+}
+
+lnmp_stop(){
+    ${PHPFPM_CONTROL} stop && ${NGINX_CONTROL} stop
+    return $?
+}
+
+lnmp_restart(){
+    lnmp_stop && lnmp_start
+    return $?
+}
+
+lnmp_reload(){
+    ${NGINX_CONTROL} reload && ${PHPFPM_CONTROL} reload
+    return $?
+}
+
+lnmp_rotate(){
+    ${LOGROTATE_BIN} ${LOGROTATE_CONF} -s ${LOGROTATE_STATUS} && \
+        sh bin/clean_log.sh clean
+    return $?
+}
+
+case "${1}" in
+    start|stop|restart|reload|rotate)
+        "lnmp_${1}"
+        ;;
+    *)
+        lnmp_help
+        ;;
+esac
+
+if [ $? -ne 0 ]; then
+    echo "[FAIL] ${1}" 1>&2
+    exit 1
+fi
+
+echo "[OK] all ${1}"
+exit 0
+

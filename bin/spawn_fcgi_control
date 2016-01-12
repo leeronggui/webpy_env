@@ -1,0 +1,43 @@
+#!/bin/sh
+
+DIR_HOME="`dirname \`readlink -f $0\``"
+CONTROL="${DIR_HOME}/bin/spawn-fcgi"
+
+
+usage(){
+    echo  "${0} start|stop|restart" >&2
+}
+
+check(){
+
+}
+sfcgi_start(){
+}
+
+sfcgi_stop(){
+}
+
+sfcgi_restart(){
+    stop && start
+    return $?
+}
+
+
+case "${1}" in
+    start|stop|restart)
+        "${1}"
+        ;;
+    *)
+        echo "start|stop|restart"
+        ;;
+esac
+
+if [ $? -ne 0 ]; then
+    echo "[FAIL] ${1}" 1>&2
+    exit 1
+fi
+
+echo "[OK] all ${1}"
+exit 0
+
+
