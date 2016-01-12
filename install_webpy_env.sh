@@ -138,3 +138,16 @@ ins_nginx(){
     warn "Install nginx success."
 }
 
+main(){
+    ins_dep
+    ins_pip
+    ins_setuptools
+    ins_pcre
+    ins_webpy
+    ins_mysqldb
+    ins_spawnfcgi
+    ins_flup
+    ins_nginx
+}
+
+main
